@@ -10,7 +10,9 @@
 			-------------------------------------------------
 			
 			v0.1 Seed
-						Curve Drawing and Control Point Movement	 				
+						+ Curve Drawing and Control Point Movement
+						+ Selection of individual 
+						Bug: Does not handle looped paths properly	 				
 			
 			*/
 //------------===========####### Globals #######===========------------
@@ -65,6 +67,21 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		  					}
 		  			}
 		  	}
+		    
+		    this.selSeg = function(segm,pnt)
+		    {
+						var segy=this.segments[segm];
+						if(pnt==1){
+								segy.selp1=segy.selp1^2;
+						}else if(pnt==2){
+								segy.selp2=segy.selp2^2;
+						}else if(pnt==3){
+								segy.selp3=segy.selp3^2;						
+						}else if(pnt==4){
+								segy.selp4=segy.selp4^2;						
+						}
+		    		console.log(segy.selp1+" "+segy.selp2+" "+segy.selp3+" "+segy.selp4);
+		    };
 		    
 		    this.newSeg = function(kind,x1,y1,x2,y2,x3,y3,x4,y4)
 		    {
@@ -266,12 +283,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    {
 						rect(this.xmin,this.ymin,this.xmax,this.ymax,"#bbb");	    		
 
-    				c.beginPath();
-    				c.moveTo(this.x1,this.y1);
-    				c.bezierCurveTo(this.x2,this.y2,this.x3,this.y3,this.x4,this.y4);
-    				c.stroke();
-
-						circ(this.x1,this.y1,10,"#888");
+//						circ(this.x1,this.y1,10,"#888");
 
 		  			if(kind==1){
 		    				c.strokeStyle="#000";
@@ -300,28 +312,25 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 						}
 		  			
 		  			// Points
-			  		c.strokeStyle="#000";
-		  			if(this.selp1==1){
-		  					rect(this.x1-4,this.y1-4,this.x1+4,this.y1+4,"#f00");
-		  			}else{
-					  		cross(this.x1,this.y1,3,"#E48");
-		  			}	
-		  			if(this.selp2==1){
-		  					rect(this.x2-4,this.y2-4,this.x2+4,this.y2+4,"#f00");
-		  			}else{
-					  		cross(this.x2,this.y2,3,"#E48");
-		  			}	
-		  			if(this.selp3==1){
-		  					rect(this.x3-4,this.y3-4,this.x3+4,this.y3+4,"#f00");
-		  			}else{
-					  		cross(this.x3,this.y3,3,"#E48");
-		  			}	
-		  			if(this.selp4==1){
-		  					rect(this.x4-4,this.y4-4,this.x4+4,this.y4+4,"#f00");
-		  			}else{
-					  		cross(this.x4,this.y4,3,"#E48");
-		  			}	
+		  			this.drawPoint(this.x1,this.y1,this.selp1);
+		  			this.drawPoint(this.x2,this.y2,this.selp2);
+		  			this.drawPoint(this.x3,this.y3,this.selp3);
+		  			this.drawPoint(this.x4,this.y4,this.selp4);
+		  	}
 
+		    this.drawPoint = function(px,py,selv)
+		    {
+			  		c.strokeStyle="#000";
+		  			if((selv&3)==3){
+								circ(px,py,6,"#AAA");
+		  					rect(px-4,py-4,px+4,py+4,"#f00");		  			
+		  			}else if((selv&1)==1){
+		  					rect(px-4,py-4,px+4,py+4,"#f00");		  			
+		  			}else if((this.selp1&2)==2){
+								circ(px,py,4,"#888");
+		  			}else{
+					  		cross(px,py,3,"#E48");
+		  			}	
 		  	}
 
 				//--------------------------------------------------------------------
@@ -400,67 +409,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 								this.segs.push(this.x3);
 								this.segs.push(this.y3);
 		    		}else if(this.kind==4){
-/*
-			var pxa1=(x2-x1)/steps;
-			var pya1=(y2-y1)/steps;
-			var pxa2=(x4-x3)/steps;
-			var pya2=(y4-y3)/steps;
-			var pxa3=(x3-x2)/steps;
-			var pya3=(y3-y2)/steps;
-			
-			var p5x=x1;
-			var p5y=y1;
-			
-			var p6x=x3;
-			var p6y=y3;
-			
-			var p7x=x2;
-			var p7y=y2;
-
-			var p8x,p8y;
-			var p9x,p9y;
-			var p10x,p10y;
-								
-			stz=1.0/steps;
-			
-			var lf=0.0;
-			var hf=1.0;
-			
-			c.lineWidth=3.0;
-			c.strokeStyle="#f80";
-			c.beginPath();
-			c.moveTo(x1,y1);
-			for(var i=0;i<steps;i++){
-
-					lf+=stz;
-					hf-=stz;
-
-					p8x=(p5x*hf)+(p7x*lf);			// P0 to P2
-					p8y=(p5y*hf)+(p7y*lf);
-
-					p9x=(p6x*lf)+(p7x*hf);			// P1 to P3			
-					p9y=(p6y*lf)+(p7y*hf);
-
-					p10x=(p9x*lf)+(p8x*hf);			// Half way between 8 and 9
-					p10y=(p9y*lf)+(p8y*hf);
-						
-      		c.lineTo(p10x,p10y);
- 
-					p5x+=pxa1;
-					p5y+=pya1;
-
-					p6x+=pxa2;
-					p6y+=pya2;
-
-					p7x+=pxa3;
-					p7y+=pya3;								
-					
-			}
-			c.lineTo(x4,y4);
-			c.stroke();
-			c.lineWidth=1.0;
-
-*/		    					    			
+		    			
 								this.xmin=Math.min(this.x1,this.x2,this.x3,this.x4)-clicktol;
 								this.xmax=Math.max(this.x1,this.x2,this.x3,this.x4)+clicktol;
 								this.ymin=Math.min(this.y1,this.y2,this.y3,this.y4)-clicktol;
@@ -661,6 +610,10 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		{
 				if(clickmode==1){
 						// Select mode
+						if(apath.sel!=null){
+								console.log(apath.sel);
+								apath.selSeg(apath.sel.segment,apath.sel.point);
+						}
 				}
 				mb=0;
 				clickmode=0;
