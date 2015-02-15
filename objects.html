@@ -1,0 +1,750 @@
+<html>
+<head>
+   <style>
+   </style>
+
+   <script>
+/*------------===========####### Drawlib #######===========------------
+
+			Path Drawing Library with Support for Thick Lines
+			-------------------------------------------------
+			
+			v0.1 Seed
+						Curve Drawing and Control Point Movement					
+			
+			*/
+//------------===========####### Globals #######===========------------
+
+var acanvas;			// Canvas DOM object
+var c;						// canvas drawing context
+var mb,cx,cy;			// Mouse Button and coordinate
+var msx,msy;			// Mouse Move Start Coordinate
+var clicktol=6;		// Click tolerance
+var clickmode=0;	// Click Mode - 1 == Drag Point
+
+//------------===========####### Classes #######===========------------
+
+		var apath=new path();
+		
+		function path() {
+				this.segments=Array();		// Segments
+				this.sel;									// Selected object info
+				
+		    this.moveTo = function(cx,cy){
+		  			// Should not happen but we make sure it is selected
+		  			if(this.sel!=null){
+		  					if(this.sel.point!=0){
+		  							var segno=this.sel.segment;
+		  							var seg=this.segments[segno];
+		  							var pnt=this.sel.point;
+//		  							console.log(pnt);
+		  							if(pnt==1){
+				  							if(this.sel.segment>0) this.segments[segno-1].moveEndpoint(cx,cy,seg.x1,seg.y1);
+				  							seg.x1=cx;
+				  							seg.y1=cy;		  									
+		  							}else if(pnt==2){
+//		  									console.log(segno+" "+(this.segments.length-2));
+		  									if(seg.kind==2&&segno<=this.segments.length-2) this.segments[this.sel.segment+1].moveStartpoint(cx,cy,seg.x2,seg.y2);
+				  							seg.x2=cx;
+				  							seg.y2=cy;		  									
+		  							}else if(pnt==3){
+		  									if(seg.kind==3&&segno<this.segments.length-2){
+		  											this.segments[segno+1].moveStartpoint(cx,cy,seg.x3,seg.y3);
+		  									} 
+				  							seg.x3=cx;
+				  							seg.y3=cy;		  									
+		  							}else if(pnt==4){
+		  									if(segno<this.segments.length-2) this.segments[this.sel.segment+1].moveStartpoint(cx,cy,seg.x4,seg.y4);
+				  							seg.x4=cx;
+				  							seg.y4=cy;
+		  							}
+		  							apath.recalc();
+//		  							apath.redraw();
+		  					}else{
+//		  							console.log("Seg!");
+		  					}
+		  			}
+		  	}
+		    
+		    this.newSeg = function(kind,x1,y1,x2,y2,x3,y3,x4,y4)
+		    {
+						this.segments.push(new segment(kind,x1,y1,x2,y2,x3,y3,x4,y4));
+		    };				
+		    
+		    this.getInfo = function()
+		    {
+						var str="";
+						for(var i=0;i<this.segments.length;i++){
+								str=str+this.segments[i].getInfo()+"\n";
+						}
+		        return str;
+		    };
+		    
+		    this.redraw = function() {
+						for(var i=0;i<this.segments.length;i++){
+								this.segments[i].redraw();
+						}
+		    };
+
+		    this.recalc = function()
+		    {
+						for(var i=0;i<this.segments.length;i++){
+								this.segments[i].recalc();
+						}
+		    };
+
+		    this.rollover = function(xk,yk)
+		    {
+						this.sel=null;
+						for(var i=0;i<this.segments.length;i++){
+								var ret=this.segments[i].rollover(xk,yk);
+								
+								// If a point or line is found
+								if(ret!=null){
+										ret.segment=i;
+										if(this.sel==null){
+												// If nothing has been selected previously
+												this.sel=ret;		
+										}else{
+												if(this.sel.point==0&&ret.point!=0){
+														// if previous is not a point set selection
+														this.sel=ret;		
+												}else if(this.sel.point==0&&ret.point==0){
+														// if neither is a point set selection
+														this.sel=ret;														
+												}
+										}		
+								}
+						}
+		    };
+		  			    
+		}
+		
+		function segment(kind,x1,y1,x2,y2,x3,y3,x4,y4)
+		{
+		
+		    this.kind = kind;
+		
+		    this.x1= x1;
+		    this.y1= y1;
+		    this.x2= x2;
+		    this.y2= y2;
+		    this.x3= x3;
+		    this.y3= y3;
+		    this.x4= x4;
+		    this.y4= y4;
+		    this.xmin= 1000;
+		    this.ymin= 1000;
+		    this.xmax= -1000;
+		    this.ymax= -1000;
+		    this.lineColor="#000";
+		    this.segs=[];
+		    this.selp1=0;
+		    this.selp2=0;
+		    this.selp3=0;
+		    this.selp4=0;
+		    
+		    this.getInfo = function() {
+		        return this.kind+" "+this.x1+" "+this.y1+" "+this.x2+" "+this.y2+" "+this.x3+" "+this.y3+" "+this.x4+" "+this.y4;
+		    };
+		    
+				//--------------------------------------------------------------------
+				// moveEndpoint - If it is same as that of other segment move it
+				//--------------------------------------------------------------------
+
+		  	this.moveStartpoint = function(cx,cy,ox,oy)
+		  	{
+//		  			console.log("SP: "+this.x1+" "+this.y1+" "+ox+" "+oy+" "+cx+" "+cy);
+		  			if(this.x1==ox&&this.y1==oy){
+		  					this.x1=cx;
+		  					this.y1=cy;
+		  			}
+		  	}
+
+				//--------------------------------------------------------------------
+				// moveEndpoint - If endpoint is same as that of other segment move it
+				//--------------------------------------------------------------------
+		  	
+		  	this.moveEndpoint = function(cx,cy,ox,oy)
+		  	{
+//		  			console.log("EP:"+this.x1+" "+this.y1+" "+this.x2+" "+this.y2+" "+this.x3+" "+this.y3+" "+this.x4+" "+this.y4+" "+ox+" "+oy+" "+cx+" "+cy);
+		  			if(this.kind==1){
+		  					if(this.x1==ox&&this.y1==oy){
+		  							this.x1=cx;
+		  							this.y1=cy;
+		  					}
+		  			}else if(this.kind==2){
+		  					if(this.x2==ox&&this.y2==oy){
+		  							this.x2=cx;
+		  							this.y2=cy;
+		  					}
+		  			}else if(this.kind==3){
+		  					if(this.x3==ox&&this.y3==oy){
+		  							this.x3=cx;
+		  							this.y3=cy;
+		  					}
+		  			}else if(this.kind==4){
+		  					if(this.x4==ox&&this.y4==oy){
+		  							this.x4=cx;
+		  							this.y4=cy;
+		  					}
+		  			}		
+		  	}
+		  	
+				//--------------------------------------------------------------------
+				// rollover - Classical Mouse Rollover
+				//--------------------------------------------------------------------
+
+		    this.rollover = function(xk,yk)
+		    {
+						// Clear rollover for all					
+						this.lineColor="#48f";
+						this.selp1=this.selp1&30;
+						this.selp2=this.selp2&30;
+						this.selp3=this.selp3&30;
+						this.selp4=this.selp4&30;
+
+		    		// Make rollover if inside box
+		    		if(xk>this.xmin&&xk<this.xmax&&yk>this.ymin&&yk<this.ymax){
+								var dst=5000;
+								var d;
+								var ls=null;
+								for(var i=0;i<this.segs.length-2;i+=2){
+										d=distToSeg(xk,yk,this.segs[i],this.segs[i+1],this.segs[i+2],this.segs[i+3]);								
+										if(d<dst){
+												ls=i;
+												dst=d;
+										} 
+								}
+								
+								if(dst<(clicktol*clicktol)){
+										this.lineColor="#f84";
+								}else{
+										ls=null;
+								}
+								
+								var pp=0;
+								if(this.kind>=1){
+										if(dist(xk,yk,this.x1,this.y1)<clicktol){
+												this.selp1=this.selp1|1;
+												pp=1;
+										}
+								}if(this.kind>=2){
+										if(dist(xk,yk,this.x2,this.y2)<clicktol){
+												this.selp2=this.selp1|1;
+												pp=2;
+										}
+								}if(this.kind>=3){
+										if(dist(xk,yk,this.x3,this.y3)<clicktol){
+												this.selp3=this.selp1|1;
+												pp=3;
+										}
+								}if(this.kind>=4){
+										if(dist(xk,yk,this.x4,this.y4)<clicktol){
+												this.selp4=this.selp1|1;
+												pp=4;
+										}
+								}
+								
+								// If either point or segment is found do the following:
+								if(pp!=0||ls!=null){
+										return {segment:0,point:pp,lineseg:ls};
+								}else{
+										return null;
+								}
+							
+		    		}else{
+		    				return null;
+		    		}		    		
+		    };
+
+				//--------------------------------------------------------------------
+				// Redraw - Draws using variables set by calc
+				//--------------------------------------------------------------------
+
+		    this.redraw = function()
+		    {
+						rect(this.xmin,this.ymin,this.xmax,this.ymax,"#bbb");	    		
+
+    				c.beginPath();
+    				c.moveTo(this.x1,this.y1);
+    				c.bezierCurveTo(this.x2,this.y2,this.x3,this.y3,this.x4,this.y4);
+    				c.stroke();
+
+						circ(this.x1,this.y1,10,"#888");
+
+		  			if(kind==1){
+		    				c.strokeStyle="#000";
+		  			}else if(kind==2){
+		    				c.strokeStyle=this.lineColor;
+		    				line(this.x1,this.y1,this.x2,this.y2,this.lineColor);
+		  			}else if(kind==3){
+		    				line(this.x1,this.y1,this.x2,this.y2,"#cdf");
+		    				line(this.x2,this.y2,this.x3,this.y3,"#cdf");		  			
+		  			}else if(kind==4){
+		    				line(this.x1,this.y1,this.x2,this.y2,"#cdf");
+		    				line(this.x3,this.y3,this.x4,this.y4,"#cdf");		    				
+		  			}	
+
+						// Do we have segs? If so, draw them!
+						if(this.segs.length>0){
+								c.lineWidth=3.0;
+								c.strokeStyle=this.lineColor;
+								c.beginPath();
+								c.moveTo(this.segs[0],this.segs[1]);
+								for(i=2;i<this.segs.length;i+=2){
+			      				c.lineTo(this.segs[i],this.segs[i+1]);								
+								}
+								c.stroke();
+								c.lineWidth=1.0;
+						}
+		  			
+		  			// Points
+			  		c.strokeStyle="#000";
+		  			if(this.selp1==1){
+		  					rect(this.x1-4,this.y1-4,this.x1+4,this.y1+4,"#f00");
+		  			}else{
+					  		cross(this.x1,this.y1,3,"#E48");
+		  			}	
+		  			if(this.selp2==1){
+		  					rect(this.x2-4,this.y2-4,this.x2+4,this.y2+4,"#f00");
+		  			}else{
+					  		cross(this.x2,this.y2,3,"#E48");
+		  			}	
+		  			if(this.selp3==1){
+		  					rect(this.x3-4,this.y3-4,this.x3+4,this.y3+4,"#f00");
+		  			}else{
+					  		cross(this.x3,this.y3,3,"#E48");
+		  			}	
+		  			if(this.selp4==1){
+		  					rect(this.x4-4,this.y4-4,this.x4+4,this.y4+4,"#f00");
+		  			}else{
+					  		cross(this.x4,this.y4,3,"#E48");
+		  			}	
+
+		  	}
+
+				//--------------------------------------------------------------------
+				// recalc - Recalculates parameters including all spans.
+				//--------------------------------------------------------------------
+		    
+		    this.recalc = function()
+		    {
+						// Clear segments array to prepare for new segment data
+						this.segs=[];
+						var steps=parseInt(document.getElementById("slider1").value);
+						
+		    		if(this.kind==1){
+		    				// Point Ojbect!
+  							this.xmin=this.x1-clicktol;
+  							this.xmax=this.x1+clicktol;
+  							this.ymin=this.y1-clicktol;
+  							this.ymax=this.y1+clicktol;
+		    		}else if(this.kind==2){
+		    				// Line Ojbect!
+								this.xmin=Math.min(this.x1,this.x2)-clicktol;
+								this.xmax=Math.max(this.x1,this.x2)+clicktol;
+								this.ymin=Math.min(this.y1,this.y2)-clicktol;
+								this.ymax=Math.max(this.y1,this.y2)+clicktol;
+
+ 								this.segs.push(this.x1);
+								this.segs.push(this.y1);
+								this.segs.push(this.x2);
+								this.segs.push(this.y2);
+
+ 		    		}else if(this.kind==3){
+		    				// Quadratic Curve Ojbect - Using Decasteljau Algorithm
+
+								this.xmin=Math.min(this.x1,this.x2,this.x3)-clicktol;
+								this.xmax=Math.max(this.x1,this.x2,this.x3)+clicktol;
+								this.ymin=Math.min(this.y1,this.y2,this.y3)-clicktol;
+								this.ymax=Math.max(this.y1,this.y2,this.y3)+clicktol;
+					
+								var pxa1=(this.x2-this.x1)/steps;
+								var pya1=(this.y2-this.y1)/steps;
+								var pxa2=(this.x3-this.x2)/steps;
+								var pya2=(this.y3-this.y2)/steps;
+								
+								var p5x=this.x1;
+								var p5y=this.y1;
+								
+								var p6x=this.x2;
+								var p6y=this.y2;
+								
+								var p7x,p7y;
+													
+								stz=1.0/steps;
+								
+								var lf=0.0;
+								var hf=1.0;
+																
+								this.segs.push(this.x1);
+								this.segs.push(this.y1);
+								for(i=0;i<steps;i++){
+										lf+=stz;
+										hf-=stz;
+					
+										p7x=(p6x*lf)+(p5x*hf);
+										p7y=(p6y*lf)+(p5y*hf);
+											
+					      		this.segs.push(p7x);
+					      		this.segs.push(p7y);
+					
+										p5x+=pxa1;
+										p5y+=pya1;
+					
+										p6x+=pxa2;
+										p6y+=pya2;
+										
+								}
+								this.segs.push(this.x3);
+								this.segs.push(this.y3);
+		    		}else if(this.kind==4){
+/*
+			var pxa1=(x2-x1)/steps;
+			var pya1=(y2-y1)/steps;
+			var pxa2=(x4-x3)/steps;
+			var pya2=(y4-y3)/steps;
+			var pxa3=(x3-x2)/steps;
+			var pya3=(y3-y2)/steps;
+			
+			var p5x=x1;
+			var p5y=y1;
+			
+			var p6x=x3;
+			var p6y=y3;
+			
+			var p7x=x2;
+			var p7y=y2;
+
+			var p8x,p8y;
+			var p9x,p9y;
+			var p10x,p10y;
+								
+			stz=1.0/steps;
+			
+			var lf=0.0;
+			var hf=1.0;
+			
+			c.lineWidth=3.0;
+			c.strokeStyle="#f80";
+			c.beginPath();
+			c.moveTo(x1,y1);
+			for(var i=0;i<steps;i++){
+
+					lf+=stz;
+					hf-=stz;
+
+					p8x=(p5x*hf)+(p7x*lf);			// P0 to P2
+					p8y=(p5y*hf)+(p7y*lf);
+
+					p9x=(p6x*lf)+(p7x*hf);			// P1 to P3			
+					p9y=(p6y*lf)+(p7y*hf);
+
+					p10x=(p9x*lf)+(p8x*hf);			// Half way between 8 and 9
+					p10y=(p9y*lf)+(p8y*hf);
+						
+      		c.lineTo(p10x,p10y);
+ 
+					p5x+=pxa1;
+					p5y+=pya1;
+
+					p6x+=pxa2;
+					p6y+=pya2;
+
+					p7x+=pxa3;
+					p7y+=pya3;								
+					
+			}
+			c.lineTo(x4,y4);
+			c.stroke();
+			c.lineWidth=1.0;
+
+*/		    					    			
+								this.xmin=Math.min(this.x1,this.x2,this.x3,this.x4)-clicktol;
+								this.xmax=Math.max(this.x1,this.x2,this.x3,this.x4)+clicktol;
+								this.ymin=Math.min(this.y1,this.y2,this.y3,this.y4)-clicktol;
+								this.ymax=Math.max(this.y1,this.y2,this.y3,this.y4)+clicktol;
+
+								var pxa1=(this.x2-this.x1)/steps;
+								var pya1=(this.y2-this.y1)/steps;
+								var pxa2=(this.x4-this.x3)/steps;
+								var pya2=(this.y4-this.y3)/steps;
+								var pxa3=(this.x3-this.x2)/steps;
+								var pya3=(this.y3-this.y2)/steps;
+								
+								var p5x=this.x1;
+								var p5y=this.y1;
+								
+								var p6x=this.x3;
+								var p6y=this.y3;
+								
+								var p7x=this.x2;
+								var p7y=this.y2;
+					
+								var p8x,p8y;
+								var p9x,p9y;
+								var p10x,p10y;
+													
+								stz=1.0/steps;
+								
+								var lf=0.0;
+								var hf=1.0;
+
+								this.segs.push(this.x1);
+								this.segs.push(this.y1);								
+								for(i=0;i<steps;i++){
+										lf+=stz;
+										hf-=stz;
+					
+										p8x=(p5x*hf)+(p7x*lf);			// P0 to P2
+										p8y=(p5y*hf)+(p7y*lf);
+					
+										p9x=(p6x*lf)+(p7x*hf);			// P1 to P3			
+										p9y=(p6y*lf)+(p7y*hf);
+					
+										p10x=(p9x*lf)+(p8x*hf);			// Half way between 8 and 9
+										p10y=(p9y*lf)+(p8y*hf);
+
+					      		this.segs.push(p10x);
+					      		this.segs.push(p10y);
+					      							
+										p5x+=pxa1;
+										p5y+=pya1;
+					
+										p6x+=pxa2;
+										p6y+=pya2;
+					
+										p7x+=pxa3;
+										p7y+=pya3;								
+										
+								}
+								this.segs.push(this.x4);
+								this.segs.push(this.y4);
+ 		    		}
+
+		    }
+		
+		    
+		}
+		
+//------------===========####### General Graphics #######===========------------
+		
+		function findPos(obj)
+		{
+		var curleft = curtop = 0;
+		if (obj.offsetParent) {
+			curleft = obj.offsetLeft
+			curtop = obj.offsetTop
+			while (obj = obj.offsetParent) {
+				curleft += obj.offsetLeft
+				curtop += obj.offsetTop
+			}
+		}
+		return {
+					x:curleft,
+					y:curtop
+			}
+		}
+		
+		function dist(x1,y1,x2,y2)
+		{
+			var dx=x2-x1;
+			var dy=y2-y1;
+			
+			return Math.sqrt((dx*dx)+(dy*dy));
+		}
+
+		function distToSeg(cx,cy,x1,y1,x2,y2)
+		{
+					var px = x2-x1;
+					var py = y2-y1;
+					var len = px*px + py*py;
+					var u = ((cx - x1) * px + (cy - y1) * py) / len;
+					
+					if(u > 1){
+						u = 1;
+					}else if(u < 0){
+						u = 0;				
+					}
+
+					var x = x1 + u * px;
+					var y = y1 + u * py;
+					px = x - cx;
+					py = y - cy;
+
+					dst = px*px + py*py;
+					return dst;
+		}
+
+		function circ(x1,y1,r,fs)
+		{
+			c.beginPath();
+			c.fillStyle=fs;
+			c.arc(x1, y1, r, 0, 2 * Math.PI, false);
+			c.fill();
+			c.stroke();
+		}        
+		
+		function line(x1,y1,x2,y2,ss)
+		{
+			c.strokeStyle=ss;
+			c.beginPath();
+			c.moveTo(x1,y1);
+			c.lineTo(x2,y2);
+			c.stroke();       
+		}
+		
+		function rect(x1,y1,x2,y2,ss)
+		{
+			c.strokeStyle=ss;
+			c.beginPath();
+			c.moveTo(x1,y1);
+			c.lineTo(x2,y1);
+			c.lineTo(x2,y2);
+			c.lineTo(x1,y2);
+			c.lineTo(x1,y1);
+			c.stroke();       				
+		}
+		
+		function cross(cx,cy,size,col){
+			c.strikestyle = col;
+			c.lineWidth = 2;
+			c.strokeStyle = col;
+			c.beginPath();
+			c.moveTo(cx - size, cy - size);
+			c.lineTo(cx + size, cy + size);
+			c.moveTo(cx + size, cy - size);
+			c.lineTo(cx - size, cy + size);
+			c.stroke();
+		}
+
+		function copySlider(dii)
+		{
+			sli=document.getElementById(dii);
+			slit=document.getElementById(dii+"text");
+			
+			slit.value=sli.value;
+			
+			apath.recalc();
+		}
+		
+		function copyVal(dii)
+		{
+			sli=document.getElementById(dii);
+			slit=document.getElementById(dii+"text");
+			
+			sli.value=slit.value;
+
+			apath.recalc();
+		}
+
+//------------===========####### UI Hookup #######===========------------  
+	
+		function mbDown(ev)
+		{
+		    // which is called button in ie <9 with different interpretation of button number
+		    if('which' in ev){
+						mb=ev.which;
+						
+						if(mb==1){
+								msx=cx;
+								msy=cy;
+								if(apath.sel!=null){
+										clickmode=1;
+								}
+						}			
+				}
+		}
+		
+		function mbUp(ev)
+		{
+				if(clickmode==1){
+						// Select mode
+				}
+				mb=0;
+				clickmode=0;
+		}
+
+		function mousemoveevt(ev, t)
+		{
+				if (ev.layerX||ev.layerX==0) { // Firefox
+				    cx=ev.layerX-acanvas.offsetLeft;
+				    cy=ev.layerY-acanvas.offsetTop;
+				} else if (ev.offsetX || ev.offsetX == 0) { // Opera
+				    cx=ev.offsetX-acanvas.offsetLeft;
+				    cy=ev.offsetY-acanvas.offsetTop;
+				}
+					
+			  coord=findPos(acanvas);
+				cx=cx-coord.x;
+				cy=cy-coord.y;
+	
+	  		var mkt=document.getElementById("mk");
+	  		mkt.innerHTML=(cx+" "+cy+" "+mb);
+		
+				if(clickmode==0){
+						// If in neutral mode do rollover
+						apath.rollover(cx,cy);
+				}else if(clickmode==1){
+						// Select Mode
+						if(dist(msx,msy,cx,cy)>clicktol) clickmode=2;		
+				}else if(clickmode==2){
+						// Move selected point
+						apath.moveTo(cx,cy);
+				}
+		} 
+	 
+//------------===========####### Application #######===========------------  
+   
+		function redraw()
+		{
+				c.clearRect(0,0,600,600);
+
+				apath.redraw();
+				
+				window.requestAnimationFrame(redraw);
+		}
+
+		function startup()
+		{
+			apath.newSeg(1,100,100);
+			apath.newSeg(3,360,210,240,50,200,250);
+			apath.newSeg(2,200,250,120,40);
+			apath.newSeg(4,120,40,160,170,440,190,400,25);
+		
+			apath.recalc();
+			
+			apath.redraw();
+		}
+ 
+		  
+  	function initcanvas()
+		{
+  		acanvas = document.getElementById("myCanvas");
+    	if (acanvas.getContext) {
+      		c = acanvas.getContext("2d");
+    			window.requestAnimationFrame(redraw);
+    	}
+		} 
+	   
+   </script>
+</head>
+
+<body onload="initcanvas();startup();">
+	      <table>
+	      	<tr>
+	      		<td><canvas id="myCanvas" width="600" height="600" onmousemove="mousemoveevt(event,this);" onmousedown="mbDown(event);" onmouseup="mbUp(event);"></canvas></td>
+	      		<td valign="top">
+	      			<div style="width:300px;height:300px;border: 1px solid #800;background:#fed;">
+	      					<span id="mk"></span><br/>
+	      					<input id="slider1" type="range" min="1" max="30" step="1" value="2" onchange="copySlider('slider1');" oninput="copySlider('slider1');" /><input id="slider1text" type="text" size="4" value="2" onchange="copyVal('slider1')" /><br/>
+	      			</div></td>
+	      	</tr>
+	      </table>
+</body>
+
+</html>
+
+
+
