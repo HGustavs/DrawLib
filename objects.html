@@ -12,9 +12,12 @@
 			v0.1 Seed
 						+ Curve Drawing and Control Point Movement
 						+ Selection of individual 
-						Bug: Does not handle looped paths properly	 				
+						Bug: Does not handle looped (circular) paths properly
+						Bug: Intersection code Does not handle vertical/horizontal lines correctly (div by zero)
+						Fix: undeclared variables -- for(i=0; to for(var i; 	 				
 			
-			*/
+*/
+
 //------------===========####### Globals #######===========------------
 
 var acanvas;			// Canvas DOM object
@@ -102,6 +105,47 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 								this.segments[i].redraw();
 						}
 		    };
+		    
+				//--------------------------------------------------------------------
+				// fill - Use Regular Canvas Functions to fill a path
+				//--------------------------------------------------------------------
+
+		    this.fill = function()
+		    {
+						if(this.segments.length>0){
+								c.globalAlpha = 0.25
+								c.beginPath();
+								var seg;
+								seg=this.segments[0];
+								c.moveTo(seg.x1,seg.y1);
+								for(var i=0;i<this.segments.length;i++){
+										seg=this.segments[i];
+										if(seg.kind==2){
+												c.lineTo(seg.x2,seg.y2);
+										}else if(seg.kind==3){
+												c.quadraticCurveTo(seg.x2,seg.y2,seg.x3,seg.y3);											
+										}else if(seg.kind==4){
+												c.bezierCurveTo(seg.x2,seg.y2,seg.x3,seg.y3,seg.x4,seg.y4);																					
+										}
+								}
+								c.fill();
+								c.globalAlpha=1.0;
+						}
+		    	
+		    };
+
+				//--------------------------------------------------------------------
+				// intersectTest - Count number of intersections for segment (may be more than one)
+				//--------------------------------------------------------------------
+
+				this.intersectTest = function(tx,ty)
+				{
+						var ist=0;
+						for(var i=0;i<this.segments.length;i++){
+								ist+=this.segments[i].intersectTest(tx,ty);
+						}
+						document.getElementById("mk").innerHTML=ist;
+				}
 
 		    this.recalc = function()
 		    {
@@ -207,6 +251,25 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		  					}
 		  			}		
 		  	}
+
+				//--------------------------------------------------------------------
+				// intersectTest - Horizontal Line intersection Test
+				//--------------------------------------------------------------------
+		  	
+		  	this.intersectTest = function(tx,ty)
+		  	{
+						// Intersect Test
+						if(tx>this.xmin&&ty>this.ymin&&cy<this.ymax)
+						{
+								// Raytest
+								var ist=0;
+								for(var i=2;i<this.segs.length;i+=2){
+				    				ist+=hraytest(tx,ty,this.segs[i-2],this.segs[i-1],this.segs[i],this.segs[i+1]);
+								}
+								return ist;
+						}	  	
+						return 0;
+		  	}
 		  	
 				//--------------------------------------------------------------------
 				// rollover - Classical Mouse Rollover
@@ -248,17 +311,17 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 										}
 								}if(this.kind>=2){
 										if(dist(xk,yk,this.x2,this.y2)<clicktol){
-												this.selp2=this.selp1|1;
+												this.selp2=this.selp2|1;
 												pp=2;
 										}
 								}if(this.kind>=3){
 										if(dist(xk,yk,this.x3,this.y3)<clicktol){
-												this.selp3=this.selp1|1;
+												this.selp3=this.selp3|1;
 												pp=3;
 										}
 								}if(this.kind>=4){
 										if(dist(xk,yk,this.x4,this.y4)<clicktol){
-												this.selp4=this.selp1|1;
+												this.selp4=this.selp4|1;
 												pp=4;
 										}
 								}
@@ -281,9 +344,8 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 
 		    this.redraw = function()
 		    {
+		    		
 						rect(this.xmin,this.ymin,this.xmax,this.ymax,"#bbb");	    		
-
-//						circ(this.x1,this.y1,10,"#888");
 
 		  			if(kind==1){
 		    				c.strokeStyle="#000";
@@ -297,14 +359,14 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    				line(this.x1,this.y1,this.x2,this.y2,"#cdf");
 		    				line(this.x3,this.y3,this.x4,this.y4,"#cdf");		    				
 		  			}	
-
+						
 						// Do we have segs? If so, draw them!
 						if(this.segs.length>0){
 								c.lineWidth=3.0;
 								c.strokeStyle=this.lineColor;
 								c.beginPath();
 								c.moveTo(this.segs[0],this.segs[1]);
-								for(i=2;i<this.segs.length;i+=2){
+								for(var i=2;i<this.segs.length;i+=2){
 			      				c.lineTo(this.segs[i],this.segs[i+1]);								
 								}
 								c.stroke();
@@ -318,6 +380,10 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		  			this.drawPoint(this.x4,this.y4,this.selp4);
 		  	}
 
+				//--------------------------------------------------------------------
+				// drawPoint - Draws a specified Control Point using a symbol
+				//--------------------------------------------------------------------
+
 		    this.drawPoint = function(px,py,selv)
 		    {
 			  		c.strokeStyle="#000";
@@ -326,7 +392,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		  					rect(px-4,py-4,px+4,py+4,"#f00");		  			
 		  			}else if((selv&1)==1){
 		  					rect(px-4,py-4,px+4,py+4,"#f00");		  			
-		  			}else if((this.selp1&2)==2){
+		  			}else if((selv&2)==2){
 								circ(px,py,4,"#888");
 		  			}else{
 					  		cross(px,py,3,"#E48");
@@ -389,7 +455,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 																
 								this.segs.push(this.x1);
 								this.segs.push(this.y1);
-								for(i=0;i<steps;i++){
+								for(var i=0;i<steps;i++){
 										lf+=stz;
 										hf-=stz;
 					
@@ -442,7 +508,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 
 								this.segs.push(this.x1);
 								this.segs.push(this.y1);								
-								for(i=0;i<steps;i++){
+								for(var i=0;i<steps;i++){
 										lf+=stz;
 										hf-=stz;
 					
@@ -588,6 +654,46 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 			apath.recalc();
 		}
 
+		function hraytest(cx,cy,x1,y1,x2,y2)
+		{
+				var by1=Math.min(y1,y2);
+				var by2=Math.max(y1,y2);
+				var bx1=Math.min(x1,x2);
+				var bx2=Math.max(x1,x2);
+
+/*				
+				c.strokeStyle="#4d4";
+				c.beginPath();
+				c.moveTo(x1,y1);
+				c.lineTo(x2,y2);
+				c.stroke();
+
+				c.strokeStyle="#f48";
+				rect(x1,y1,x2,y2);
+*/
+				
+	  		if(cy>=by1&&cy<=by2&&cx>=bx1){
+			  		var dx=x2-x1;
+			  		var dy=y2-y1;
+			  		var k=dx/dy;
+			  		m=x1-(k*y1);
+			  		
+			  		var cpx=(k*cy)+m;
+			  		var cpy=cy;
+			  			  		
+			  		cross(cpx,cpy,5,"#f48");
+			  		
+			  		if(cx>=cpx){
+			  				return 1;
+			  		}else{
+			  				return 0;
+			  		}	  		
+	  				
+	  		}else{
+	  				return 0;
+	  		}		
+		}
+		
 //------------===========####### UI Hookup #######===========------------  
 	
 		function mbDown(ev)
@@ -614,6 +720,8 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 								console.log(apath.sel);
 								apath.selSeg(apath.sel.segment,apath.sel.point);
 						}
+				}else if(clickmode==0){
+						alert("Digby!");
 				}
 				mb=0;
 				clickmode=0;
@@ -632,10 +740,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 			  coord=findPos(acanvas);
 				cx=cx-coord.x;
 				cy=cy-coord.y;
-	
-	  		var mkt=document.getElementById("mk");
-	  		mkt.innerHTML=(cx+" "+cy+" "+mb);
-		
+			
 				if(clickmode==0){
 						// If in neutral mode do rollover
 						apath.rollover(cx,cy);
@@ -654,20 +759,27 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		{
 				c.clearRect(0,0,600,600);
 
+				c.beginPath();
+				c.moveTo(0,cy);
+				c.lineTo(cx,cy);
+				c.stroke();
+
+				apath.recalc();				
 				apath.redraw();
+				apath.intersectTest(cx,cy);
+				apath.fill();
 				
 				window.requestAnimationFrame(redraw);
 		}
 
 		function startup()
 		{
-			apath.newSeg(1,100,100);
+			apath.newSeg(2,400,25,360,210);
 			apath.newSeg(3,360,210,240,50,200,250);
 			apath.newSeg(2,200,250,120,40);
 			apath.newSeg(4,120,40,160,170,440,190,400,25);
 		
 			apath.recalc();
-			
 			apath.redraw();
 		}
  
