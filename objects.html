@@ -482,20 +482,32 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
   							this.ymax=this.y1+clicktol;
 		    		}else if(this.kind==2){
 		    				// Line Ojbect!
+		    				steps=4;
 								this.xmin=Math.min(this.x1,this.x2)-clicktol;
 								this.xmax=Math.max(this.x1,this.x2)+clicktol;
 								this.ymin=Math.min(this.y1,this.y2)-clicktol;
 								this.ymax=Math.max(this.y1,this.y2)+clicktol;
 
- 								this.segs.push(this.x1);
-								this.segs.push(this.y1);
-								this.segmin.push(Math.min(this.x1,this.x2));
-								this.segmin.push(Math.min(this.y1,this.y2));								
-								this.segmax.push(Math.max(this.x1,this.x2));
-								this.segmax.push(Math.max(this.y1,this.y2));								
-								this.segs.push(this.x2);
-								this.segs.push(this.y2);
-
+ 								var ccx,ccy;
+ 								var dx,dy;
+ 								
+ 								ccx=this.x1;
+ 								ccy=this.y1;
+ 								dx=(this.x2-this.x1)/steps;
+ 								dy=(this.y2-this.y1)/steps;
+ 								
+ 								for(i=0;i<=steps;i++){
+		 								this.segs.push(ccx);
+										this.segs.push(ccy);
+										this.segmin.push(Math.min(ccx,ccx+dx));
+										this.segmin.push(Math.min(ccy,ccy+dy));								
+										this.segmax.push(Math.max(ccx,ccx+dx));
+										this.segmax.push(Math.max(ccy,ccy+dy));								
+ 								
+ 										ccx+=dx;
+ 										ccy+=dy;
+ 								}
+ 								
  		    		}else if(this.kind==3){
 		    				// Quadratic Curve Ojbect - Using Decasteljau Algorithm
 
@@ -904,7 +916,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 				
 				apath.intersect(bpath);
 
-//				window.requestAnimationFrame(redraw);
+				window.requestAnimationFrame(redraw);
 		}
 
 		function startup()
