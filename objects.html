@@ -4,18 +4,26 @@
    </style>
 
    <script>
-/*------------===========####### Drawlib #######===========------------
+//------------===========####### Drawlib #######===========------------
 
+/*
 			Path Drawing Library with Support for Thick Lines
 			-------------------------------------------------
 			
 			v0.1 Seed
 						+ Curve Drawing and Control Point Movement
-						+ Selection of individual 
+						+ Selection of individual
+						+ Intersection of horizontal line and segment (evenodd rule)
+						+ Reusable Bounding Box for segments 
 						Bug: Does not handle looped (circular) paths properly
 						Bug: Intersection code Does not handle vertical/horizontal lines correctly (div by zero)
+						Bug: Line clicks do not select line drag does not move line
 						Fix: undeclared variables -- for(i=0; to for(var i; 	 				
+
+			Documentation
+			---------------
 			
+			Segments are stored interleaved x1,y1,xmin,ymin,xmax,ymax,x2,y2 ...			
 */
 
 //------------===========####### Globals #######===========------------
@@ -30,12 +38,61 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 //------------===========####### Classes #######===========------------
 
 		var apath=new path();
+		var bpath=new path();
 		
 		function path() {
 				this.segments=Array();		// Segments
 				this.sel;									// Selected object info
 				
-		    this.moveTo = function(cx,cy){
+				//--------------------------------------------------------------------
+				// intersect - performs intersection against the path in the parameter
+				//--------------------------------------------------------------------
+				
+		    this.intersect = function(otherpath)
+		    {
+		    		var ll=this.segments.length;
+		    		var kk=otherpath.segments.length;
+		    		var mm,nn;
+		    		
+						for(var i=0;i<ll;i++){
+								var seg = this.segments[i];
+								for(var j=0;j<kk;j++){
+										var segb = otherpath.segments[j];
+										if(recttest(seg.x1,seg.y1,seg.x2,seg.y2,segb.xmin,segb.ymin,segb.xmax,segb.ymax)){
+												mm=seg.segs.length;
+												for(var k=0;k<mm-2;k+=2){
+														nn=segb.segs.length;
+//														nn=4;
+														for(var l=0;l<nn-2;l+=2){
+																// rect(seg.segmin[k],seg.segmin[k+1],seg.segmax[k],seg.segmax[k+1]);
+																rect(segb.segmin[l],segb.segmin[l+1],segb.segmax[l],segb.segmax[l+1]);
+
+																c.strokeStyle="#48f";
+																c.beginPath();
+																c.moveTo(segb.segs[l],segb.segs[l+1]);
+																c.lineTo(segb.segs[l+2],segb.segs[l+3]);																
+																c.stroke();
+
+//																	linetest(seg.segs[k],seg.segs[k+1],seg.segs[k+2],seg.segs[k+3],segb.segs[l],segb.segs[l+1],segb.segs[l+2],segb.segs[l+3]);
+														}
+												}
+										}
+								}
+						}		    	
+		    }
+
+
+	//														d=distToSeg(xk,yk,this.segs[i],this.segs[i+1],this.segs[i+2],this.segs[i+3]);								
+
+//												rect(segb.xmin,segb.ymin,segb.xmax,segb.ymax,"#4f4");										
+//												rect(seg.xmin,seg.ymin,seg.xmax,seg.ymax,"#4f4");
+//												alert(i+"  "+j);
+//												rect(segb.xmin,segb.ymin,segb.xmax,segb.ymax,"#fff");										
+//												rect(seg.xmin,seg.ymin,seg.xmax,seg.ymax,"#fff");
+
+		    
+		    this.moveTo = function(cx,cy)
+		    {
 		  			// Should not happen but we make sure it is selected
 		  			if(this.sel!=null){
 		  					if(this.sel.point!=0){
@@ -64,7 +121,6 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 				  							seg.y4=cy;
 		  							}
 		  							apath.recalc();
-//		  							apath.redraw();
 		  					}else{
 //		  							console.log("Seg!");
 		  					}
@@ -113,6 +169,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    this.fill = function()
 		    {
 						if(this.segments.length>0){
+								c.mozFillRule = 'evenodd';
 								c.globalAlpha = 0.25
 								c.beginPath();
 								var seg;
@@ -199,7 +256,11 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    this.xmax= -1000;
 		    this.ymax= -1000;
 		    this.lineColor="#000";
+
 		    this.segs=[];
+		    this.segmin=[];
+		    this.segmax=[];
+
 		    this.selp1=0;
 		    this.selp2=0;
 		    this.selp3=0;
@@ -345,7 +406,8 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    this.redraw = function()
 		    {
 		    		
-						rect(this.xmin,this.ymin,this.xmax,this.ymax,"#bbb");	    		
+		    		// Draw bounding box on hover
+						if(this.lineColor=="#f84") rect(this.xmin,this.ymin,this.xmax,this.ymax,"#bbb");	    		
 
 		  			if(kind==1){
 		    				c.strokeStyle="#000";
@@ -407,6 +469,9 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    {
 						// Clear segments array to prepare for new segment data
 						this.segs=[];
+						this.segmin=[];
+						this.segmax=[];
+
 						var steps=parseInt(document.getElementById("slider1").value);
 						
 		    		if(this.kind==1){
@@ -424,6 +489,10 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 
  								this.segs.push(this.x1);
 								this.segs.push(this.y1);
+								this.segmin.push(Math.min(this.x1,this.x2));
+								this.segmin.push(Math.min(this.y1,this.y2));								
+								this.segmax.push(Math.max(this.x1,this.x2));
+								this.segmax.push(Math.max(this.y1,this.y2));								
 								this.segs.push(this.x2);
 								this.segs.push(this.y2);
 
@@ -455,25 +524,41 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 																
 								this.segs.push(this.x1);
 								this.segs.push(this.y1);
+								var lx=this.x1;
+								var ly=this.y1;
 								for(var i=0;i<steps;i++){
 										lf+=stz;
 										hf-=stz;
-					
+
 										p7x=(p6x*lf)+(p5x*hf);
 										p7y=(p6y*lf)+(p5y*hf);
 											
+					      		this.segmin.push(Math.min(p7x,lx));
+					      		this.segmin.push(Math.min(p7y,ly));
+					      		this.segmax.push(Math.max(p7x,lx));
+					      		this.segmax.push(Math.max(p7y,ly));
 					      		this.segs.push(p7x);
 					      		this.segs.push(p7y);
-					
+					      							      							
 										p5x+=pxa1;
 										p5y+=pya1;
 					
 										p6x+=pxa2;
 										p6y+=pya2;
+
+					      		lx=p7x;
+					      		ly=p7y;
 										
 								}
+
+			      		this.segmin.push(Math.min(this.x3,lx));
+			      		this.segmin.push(Math.min(this.y3,ly));
+			      		this.segmax.push(Math.max(this.x3,lx));
+			      		this.segmax.push(Math.max(this.y3,ly));
+
 								this.segs.push(this.x3);
 								this.segs.push(this.y3);
+
 		    		}else if(this.kind==4){
 		    			
 								this.xmin=Math.min(this.x1,this.x2,this.x3,this.x4)-clicktol;
@@ -507,7 +592,9 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 								var hf=1.0;
 
 								this.segs.push(this.x1);
-								this.segs.push(this.y1);								
+								this.segs.push(this.y1);
+								var lx=this.x1;
+								var ly=this.y1;								
 								for(var i=0;i<steps;i++){
 										lf+=stz;
 										hf-=stz;
@@ -521,6 +608,11 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 										p10x=(p9x*lf)+(p8x*hf);			// Half way between 8 and 9
 										p10y=(p9y*lf)+(p8y*hf);
 
+					      		this.segmin.push(Math.min(p10x,lx));
+					      		this.segmin.push(Math.min(p10y,ly));
+					      		this.segmax.push(Math.max(p10x,lx));
+					      		this.segmax.push(Math.max(p10y,ly));
+
 					      		this.segs.push(p10x);
 					      		this.segs.push(p10y);
 					      							
@@ -532,10 +624,19 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 					
 										p7x+=pxa3;
 										p7y+=pya3;								
-										
+
+										lx=p10x;
+										ly=p10y;										
 								}
+
+			      		this.segmin.push(Math.min(this.x4,lx));
+			      		this.segmin.push(Math.min(this.y4,ly));
+			      		this.segmax.push(Math.max(this.x4,lx));
+			      		this.segmax.push(Math.max(this.y4,ly));
+
 								this.segs.push(this.x4);
 								this.segs.push(this.y4);
+
  		    		}
 
 		    }
@@ -662,6 +763,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 				var bx2=Math.max(x1,x2);
 
 /*				
+				c.lineWidth=1.0;
 				c.strokeStyle="#4d4";
 				c.beginPath();
 				c.moveTo(x1,y1);
@@ -670,6 +772,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 
 				c.strokeStyle="#f48";
 				rect(x1,y1,x2,y2);
+				c.lineWidth=3.0;
 */
 				
 	  		if(cy>=by1&&cy<=by2&&cx>=bx1){
@@ -692,6 +795,31 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 	  		}else{
 	  				return 0;
 	  		}		
+		}
+
+		function recttest(x1a,y1a,x2a,y2a,x1b,y1b,x2b,y2b)
+		{
+    	// r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top
+    	return !(x1b > x2a || x2b < x1a || y1b > y2a || y2b < y1a);
+		}
+		
+		function linetest(x1a,y1a,x2a,y2a,x1b,y1b,x2b,y2b)
+		{
+				
+				c.lineWidth=1.0;
+				c.strokeStyle="#f48";
+				c.beginPath();
+				c.moveTo(x1a,y1a);
+				c.lineTo(x2a,y2a);
+				c.stroke();
+
+				c.lineWidth=1.0;
+				c.strokeStyle="#4f8";
+				c.beginPath();
+				c.moveTo(x1b,y1b);
+				c.lineTo(x2b,y2b);
+				c.stroke();
+		
 		}
 		
 //------------===========####### UI Hookup #######===========------------  
@@ -759,28 +887,43 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		{
 				c.clearRect(0,0,600,600);
 
+				c.lineWidth=1.0;
 				c.beginPath();
 				c.moveTo(0,cy);
 				c.lineTo(cx,cy);
 				c.stroke();
+				c.ineWidth=3.0;
 
 				apath.recalc();				
-				apath.redraw();
-				apath.intersectTest(cx,cy);
-				apath.fill();
+				//apath.redraw();
+				//apath.intersectTest(cx,cy);
+//				apath.fill();
 				
-				window.requestAnimationFrame(redraw);
+				bpath.recalc();
+				//bpath.redraw();
+				
+				apath.intersect(bpath);
+
+//				window.requestAnimationFrame(redraw);
 		}
 
 		function startup()
 		{
-			apath.newSeg(2,400,25,360,210);
-			apath.newSeg(3,360,210,240,50,200,250);
-			apath.newSeg(2,200,250,120,40);
-			apath.newSeg(4,120,40,160,170,440,190,400,25);
+			apath.newSeg(2,400,125,360,310);
+			apath.newSeg(3,360,310,240,50,200,350);
+			apath.newSeg(2,200,350,120,140);
+			apath.newSeg(4,120,140,160,170,440,190,400,125);
+			
+			bpath.newSeg(2,250,70,420,180);
+			bpath.newSeg(3,420,180,200,370,215,190);
+			bpath.newSeg(4,215,190,160,90,140,90,250,70);
+			
 		
 			apath.recalc();
 			apath.redraw();
+			
+			bpath.recalc();
+			bpath.redraw();
 		}
  
 		  
