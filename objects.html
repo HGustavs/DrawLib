@@ -18,7 +18,8 @@
 						Bug: Does not handle looped (circular) paths properly
 						Bug: Intersection code Does not handle vertical/horizontal lines correctly (div by zero)
 						Bug: Line clicks do not select line drag does not move line
-						Fix: undeclared variables -- for(i=0; to for(var i; 	 				
+						Fix: undeclared variables -- for(i=0; to for(var i;
+						Fix: Tests performed on wrong box recttest(seg.x1,seg.y1 instead of recttest(seg.xmin,seg.ymin 	 				
 
 			Documentation
 			---------------
@@ -34,6 +35,7 @@ var mb,cx,cy;			// Mouse Button and coordinate
 var msx,msy;			// Mouse Move Start Coordinate
 var clicktol=6;		// Click tolerance
 var clickmode=0;	// Click Mode - 1 == Drag Point
+var inter=0;			// Intersection tesst counter
 
 //------------===========####### Classes #######===========------------
 
@@ -43,6 +45,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		function path() {
 				this.segments=Array();		// Segments
 				this.sel;									// Selected object info
+				this.intarr=Array();			// Intersection list (one list per segment)
 				
 				//--------------------------------------------------------------------
 				// intersect - performs intersection against the path in the parameter
@@ -53,43 +56,68 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    		var ll=this.segments.length;
 		    		var kk=otherpath.segments.length;
 		    		var mm,nn;
-		    		
+		    		var ist="";
+		    		inter=0;
+		    		console.clear();
+
+						// Clear both intersection lists
+						this.intarr=[];
+						otherpath.intarr=[];
+
 						for(var i=0;i<ll;i++){
 								var seg = this.segments[i];
 								for(var j=0;j<kk;j++){
 										var segb = otherpath.segments[j];
-										if(recttest(seg.x1,seg.y1,seg.x2,seg.y2,segb.xmin,segb.ymin,segb.xmax,segb.ymax)){
+										if(recttest(seg.xmin,seg.ymin,seg.xmax,seg.ymax,segb.xmin,segb.ymin,segb.xmax,segb.ymax)){
 												mm=seg.segs.length;
 												for(var k=0;k<mm-2;k+=2){
 														nn=segb.segs.length;
-//														nn=4;
 														for(var l=0;l<nn-2;l+=2){
-																// rect(seg.segmin[k],seg.segmin[k+1],seg.segmax[k],seg.segmax[k+1]);
-																rect(segb.segmin[l],segb.segmin[l+1],segb.segmax[l],segb.segmax[l+1]);
-
-																c.strokeStyle="#48f";
-																c.beginPath();
-																c.moveTo(segb.segs[l],segb.segs[l+1]);
-																c.lineTo(segb.segs[l+2],segb.segs[l+3]);																
-																c.stroke();
-
-//																	linetest(seg.segs[k],seg.segs[k+1],seg.segs[k+2],seg.segs[k+3],segb.segs[l],segb.segs[l+1],segb.segs[l+2],segb.segs[l+3]);
+																//rect(seg.segmin[k],seg.segmin[k+1],seg.segmax[k],seg.segmax[k+1]);
+																if(recttest(segb.segmin[l],segb.segmin[l+1],segb.segmax[l],segb.segmax[l+1],seg.segmin[k],seg.segmin[k+1],seg.segmax[k],seg.segmax[k+1])){
+																		//rect(segb.segmin[l],segb.segmin[l+1],segb.segmax[l],segb.segmax[l+1],"#f48");
+																		//rect(seg.segmin[k],seg.segmin[k+1],seg.segmax[k],seg.segmax[k+1],"#84F");
+																		var pnt=linetest(seg.segs[k],seg.segs[k+1],seg.segs[k+2],seg.segs[k+3],segb.segs[l],segb.segs[l+1],segb.segs[l+2],segb.segs[l+3]);
+																		if(pnt!=false){
+																				if(this.intarr[i]==null) this.intarr[i]=[];
+																				if(otherpath.intarr[j]==null) otherpath.intarr[j]=[];
+																				this.intarr[i].push({offs:k,coord:pnt,segno:j});
+																				otherpath.intarr[j].push(l);
+																				// cross(pnt.x,pnt.y,8,"#48F");
+																		}
+																}
 														}
 												}
+												// End of inner for loops
 										}
 								}
 						}		    	
+						
+						// A segment split
+						for(var i=0;i<1/*this.intarr.length*/;i++){
+								if(this.intarr[i]!=null){
+										
+										// For each intersection									
+										datan=this.intarr[i];
+										for(var j=0;j<datan.length;j++){
+												var intr=datan[j];
+												var ret=decastInt(this.segments[i],intr.coord.x,intr.coord.y,intr.offs);
+												console.log(ret);
+										}
+										
+								}
+//								console.log("F: "+i+" "+this.intarr[i])
+						}
+
+/*
+						for(var i=0;i<otherpath.intarr.length;i++){
+//								console.log("G: "+i+" "+otherpath.intarr[i])
+						}
+*/
+
+						document.getElementById("mk").innerHTML=inter;
+//						alert("TK");
 		    }
-
-
-	//														d=distToSeg(xk,yk,this.segs[i],this.segs[i+1],this.segs[i+2],this.segs[i+3]);								
-
-//												rect(segb.xmin,segb.ymin,segb.xmax,segb.ymax,"#4f4");										
-//												rect(seg.xmin,seg.ymin,seg.xmax,seg.ymax,"#4f4");
-//												alert(i+"  "+j);
-//												rect(segb.xmin,segb.ymin,segb.xmax,segb.ymax,"#fff");										
-//												rect(seg.xmin,seg.ymin,seg.xmax,seg.ymax,"#fff");
-
 		    
 		    this.moveTo = function(cx,cy)
 		    {
@@ -260,6 +288,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		    this.segs=[];
 		    this.segmin=[];
 		    this.segmax=[];
+		    this.iarr=[]
 
 		    this.selp1=0;
 		    this.selp2=0;
@@ -482,7 +511,7 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
   							this.ymax=this.y1+clicktol;
 		    		}else if(this.kind==2){
 		    				// Line Ojbect!
-		    				steps=4;
+		    				steps=8;
 								this.xmin=Math.min(this.x1,this.x2)-clicktol;
 								this.xmax=Math.max(this.x1,this.x2)+clicktol;
 								this.ymin=Math.min(this.y1,this.y2)-clicktol;
@@ -725,6 +754,10 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 		
 		function rect(x1,y1,x2,y2,ss)
 		{
+			if(x2<x1||y2<y1){
+					alert("DEFPROB!");
+			}
+			
 			c.strokeStyle=ss;
 			c.beginPath();
 			c.moveTo(x1,y1);
@@ -811,26 +844,49 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 
 		function recttest(x1a,y1a,x2a,y2a,x1b,y1b,x2b,y2b)
 		{
-    	// r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top
+//    	if(x2a<x1a) alert("FELO 1"); 
+			inter++;
     	return !(x1b > x2a || x2b < x1a || y1b > y2a || y2b < y1a);
 		}
 		
-		function linetest(x1a,y1a,x2a,y2a,x1b,y1b,x2b,y2b)
+		function linetest(x1,y1,x2,y2, x3,y3,x4,y4)
 		{
-				
-				c.lineWidth=1.0;
-				c.strokeStyle="#f48";
+				c.strokeStyle="#4f4";
+				c.lineWidth=4.0;
 				c.beginPath();
-				c.moveTo(x1a,y1a);
-				c.lineTo(x2a,y2a);
+				c.moveTo(x1,y1);
+				c.lineTo(x2,y2);
+				c.moveTo(x3,y3);
+				c.lineTo(x4,y4);
 				c.stroke();
-
-				c.lineWidth=1.0;
-				c.strokeStyle="#4f8";
-				c.beginPath();
-				c.moveTo(x1b,y1b);
-				c.lineTo(x2b,y2b);
-				c.stroke();
+		    
+		    var x=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4));
+		    var y=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4));
+		    if (isNaN(x)||isNaN(y)) {
+		        return false;
+		    } else {
+		        if (x1>=x2) {
+		            if (!(x2<=x&&x<=x1)) {return false;}
+		        } else {
+		            if (!(x1<=x&&x<=x2)) {return false;}
+		        }
+		        if (y1>=y2) {
+		            if (!(y2<=y&&y<=y1)) {return false;}
+		        } else {
+		            if (!(y1<=y&&y<=y2)) {return false;}
+		        }
+		        if (x3>=x4) {
+		            if (!(x4<=x&&x<=x3)) {return false;}
+		        } else {
+		            if (!(x3<=x&&x<=x4)) {return false;}
+		        }
+		        if (y3>=y4) {
+		            if (!(y4<=y&&y<=y3)) {return false;}
+		        } else {
+		            if (!(y3<=y&&y<=y4)) {return false;}
+		        }
+		    }
+		    return {x:x,y:y};
 		
 		}
 		
@@ -892,6 +948,11 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 						apath.moveTo(cx,cy);
 				}
 		} 
+
+		function decastInt(segm,crd,offs)
+		{
+//				alert("Decast: "+segm.kind+" "+offs);
+		}
 	 
 //------------===========####### Application #######===========------------  
    
@@ -907,14 +968,15 @@ var clickmode=0;	// Click Mode - 1 == Drag Point
 				c.ineWidth=3.0;
 
 				apath.recalc();				
-				//apath.redraw();
-				//apath.intersectTest(cx,cy);
-//				apath.fill();
+				apath.redraw();
 				
-				bpath.recalc();
-				//bpath.redraw();
+				apath.intersectTest(cx,cy);
+				apath.fill();
 				
-				apath.intersect(bpath);
+//				bpath.recalc();
+//				bpath.redraw();
+				
+//				apath.intersect(bpath);
 
 				window.requestAnimationFrame(redraw);
 		}
